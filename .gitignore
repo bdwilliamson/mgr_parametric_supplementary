@@ -1,0 +1,68 @@
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# LaTeX stuff #
+###############
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
+*.tex.bak
+*.fff
+*.ttt
+*.fdb_latexmk
+*.fls
+*.toc
+*.pdf
+
+# R stuff #
+###########
+*.Rhistory
+*.Rproj.user
+*.Rproj
+.Rproj.user
+*.Rdata
+*.rds
+
+# Misc stuff #
+##############
+sandbox/*
+docs/*
+data/*
+*.docx
+*.xlsx
+*.png
+*.csv
+plots/*
+sim_code/compile_output/*
+results/*
+*.zip
+arxiv_submission/*
+files_from_overleaf/*
+jasa_submission/*
+code/data_analysis/archive/*
+code/archive/*
+code/sandbox/*
