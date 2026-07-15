@@ -1,6 +1,6 @@
 # Replicate data analyses
 
-This file describes how to reproduce the data analysis. All analyses were implemented in the freely available R programming language, specifically, R version 4.0.2 or later. 
+This file describes how to reproduce the data analysis. The data are not provided to protect confidentiality. All analyses were implemented in the freely available R programming language, specifically, R version 4.0.2 or later. 
 
 The files are:
 * `00_vccc_cleaning_utils.R`: utility functions for cleaning the VCCC data
