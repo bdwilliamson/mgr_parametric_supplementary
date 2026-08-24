@@ -89,6 +89,42 @@ exposure_mean_1_validated <- estimate_tx_specific_mean(
   prob_ps = predict(exposure_ps_validated, type = "response"), type = "aipw",
   rescale_ps = FALSE
 )
+exposure_mean_0_validated_g <- estimate_tx_specific_mean(
+  y = vccc_dat$ade_death_bin, a = vccc_dat$contains_pi, a_level = 0, delta = rep(1, nrow(vccc_dat)),
+  outcome_regression = predict(or_validated, type = "response"),
+  outcome_regression_a = predict(or_validated, newdata = newdata_0, type = "response"),
+  prob_ps = 1 - predict(exposure_ps_validated, type = "response"), type = "g_comp",
+  rescale_ps = FALSE
+)
+exposure_mean_1_validated_g <- estimate_tx_specific_mean(
+  y = vccc_dat$ade_death_bin, a = vccc_dat$contains_pi, a_level = 1, delta = rep(1, nrow(vccc_dat)),
+  outcome_regression = predict(or_validated, type = "response"),
+  outcome_regression_a = predict(or_validated, newdata = newdata_1, type = "response"),
+  prob_ps = predict(exposure_ps_validated, type = "response"), type = "g_comp",
+  rescale_ps = FALSE
+)
+exposure_mean_0_validated_iptw <- estimate_tx_specific_mean(
+  y = vccc_dat$ade_death_bin, a = vccc_dat$contains_pi, a_level = 0, delta = rep(1, nrow(vccc_dat)),
+  outcome_regression = predict(or_validated, type = "response"),
+  outcome_regression_a = predict(or_validated, newdata = newdata_0, type = "response"),
+  prob_ps = 1 - predict(exposure_ps_validated, type = "response"), type = "ipw",
+  rescale_ps = FALSE
+)
+exposure_mean_1_validated_iptw <- estimate_tx_specific_mean(
+  y = vccc_dat$ade_death_bin, a = vccc_dat$contains_pi, a_level = 1, delta = rep(1, nrow(vccc_dat)),
+  outcome_regression = predict(or_validated, type = "response"),
+  outcome_regression_a = predict(or_validated, newdata = newdata_1, type = "response"),
+  prob_ps = predict(exposure_ps_validated, type = "response"), type = "ipw",
+  rescale_ps = FALSE
+)
+data.frame(
+  type = c("g_comp", "iptw", "aiptw"),
+  mu0 = c(exposure_mean_0_validated_g, exposure_mean_0_validated_iptw, exposure_mean_0_validated),
+  mu1 = c(exposure_mean_1_validated_g, exposure_mean_1_validated_iptw, exposure_mean_1_validated)
+) %>%
+  mutate(ate = mu1 - mu0,
+         rr = mu1 / mu0)
+
 # unvalidated exposure-specific means
 exposure_mean_0_unvalidated <- estimate_tx_specific_mean(
   y = vccc_dat$ade_death_bin_star, a = vccc_dat$contains_pi_star, a_level = 0, delta = rep(1, nrow(vccc_dat)),

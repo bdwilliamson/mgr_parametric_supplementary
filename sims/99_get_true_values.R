@@ -14,7 +14,7 @@ source(paste0(proj_root, "/code/sims/02_run_ests.R"))
 
 
 # scenarios <- c(1:10, 15)
-scenarios <- c(1:10, 97, 96, 99, 98)
+scenarios <- c(1:10, 12, 14, 97, 96, 99, 98)
 future::plan(multisession)
 set.seed(20240919)
 true_values_list <- future.apply::future_lapply(

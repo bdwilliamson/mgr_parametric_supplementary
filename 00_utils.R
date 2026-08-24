@@ -87,11 +87,15 @@ eif_tx_mean_parametric <- function(nonparametric_eif = NULL, glm_fit = NULL,
 full_data_eif <- function(mu1 = NULL, mu0 = NULL, eif1 = NULL, eif0 = NULL, estimand = "mRD") {
   if (grepl("RD", estimand, ignore.case = TRUE)) {
     eif <- eif1 - eif0
-  } else if (grepl("RR", estimand, ignore.case = TRUE)) {
+  } else if (grepl("RR", estimand, ignore.case = TRUE) & !grepl("nolog", estimand, ignore.case = TRUE)) {
     eif <- eif1 / mu1 - eif0 / mu0
-  } else {
+  } else if (grepl("OR", estimand, ignore.case = TRUE)) {
     # eif <- (eif1 + mu1) / (mu1 * (1 - mu1)) - (eif0 + mu0) / (mu0 * (1 - mu0))
     eif <- (1 / (mu1 * (1 - mu1))) * eif1 - (1 / (mu0 * (1 - mu0))) * eif0
+  } else if (grepl("RR", estimand, ignore.case = TRUE) & grepl("nolog", estimand, ignore.case = TRUE)) {
+    eif <- eif1 / mu0 - eif0 * mu1 / (mu0 ^ 2)
+  } else {
+    stop("The requested estimand has not yet been implemented.")
   }
   return(eif)
 }
@@ -343,6 +347,9 @@ estimate_eif_projection_mi <- function(outcome_formula = NULL, tx_formula = NULL
                                        family = "binomial",
                                        miss_prob = NULL, tx_type = "adjust",
                                        rescale_miss = TRUE, rescale_ps = FALSE, use_meat = TRUE) {
+  if (is.character(family)) {
+    family <- match.fun(family)()
+  }
   init_fit <- glm(formula = as.formula(outcome_formula), family = family, data = data)
   num_coefs <- length(coefficients(init_fit))
   # get optimal raking variable: expected value of influence function by averaging over MI datasets
@@ -407,12 +414,13 @@ estimate_eif_projection_mi <- function(outcome_formula = NULL, tx_formula = NULL
       infMat_all[,,i] <- get_glm_eif(mi_fit, use_meat = use_meat)
     }
     obs_data_eif <- rowMeans(infMat_all, dims = 2)
-    obs_data_eif_rd <- obs_data_eif_rr <- obs_data_eif_or <- obs_data_eif_1 <- obs_data_eif_0 <- obs_data_eif
+    obs_data_eif_rd <- obs_data_eif_rr <- obs_data_eif_rr_nolog <- obs_data_eif_or <- obs_data_eif_1 <- obs_data_eif_0 <- obs_data_eif
   } else {
     inf_mat_1 <- matrix(0, nrow = nrow(data), ncol = n_imp)
     inf_mat_0 <- matrix(0, nrow = nrow(data), ncol = n_imp)
     inf_mat_rd <- matrix(0, nrow = nrow(data), ncol = n_imp)
     inf_mat_rr <- matrix(0, nrow = nrow(data), ncol = n_imp)
+    inf_mat_rr_nolog <- matrix(0, nrow = nrow(data), ncol = n_imp)
     inf_mat_or <- matrix(0, nrow = nrow(data), ncol = n_imp)
     outcome_name <- gsub(" ", "", strsplit(outcome_formula, "~", fixed = TRUE)[[1]][1])
     delta <- rep(1, nrow(data))
@@ -474,6 +482,9 @@ estimate_eif_projection_mi <- function(outcome_formula = NULL, tx_formula = NULL
       inf_mat_rr[, i] <- full_data_eif(mu1 = mu_1, mu0 = mu_0,
                                        eif1 = eif_1, eif0 = eif_0,
                                        estimand = "RR")
+      inf_mat_rr_nolog[, i] <- full_data_eif(mu1 = mu_1, mu0 = mu_0,
+                                             eif1 = eif_1, eif0 = eif_0,
+                                             estimand = "nologRR")
       inf_mat_or[, i] <- full_data_eif(mu1 = mu_1, mu0 = mu_0,
                                        eif1 = eif_1, eif0 = eif_0,
                                        estimand = "OR")
@@ -483,11 +494,13 @@ estimate_eif_projection_mi <- function(outcome_formula = NULL, tx_formula = NULL
     obs_data_eif_0 <- rowMeans(inf_mat_0)
     obs_data_eif_rd <- rowMeans(inf_mat_rd)
     obs_data_eif_rr <- rowMeans(inf_mat_rr)
+    obs_data_eif_rr_nolog <- rowMeans(inf_mat_rr_nolog)
     obs_data_eif_or <- rowMeans(inf_mat_or)
   }
   return(list("eif" = obs_data_eif, "eif_rr" = obs_data_eif_rr,
               "eif_rd" = obs_data_eif_rd, "eif_or" = obs_data_eif_or,
-              "eif_1" = obs_data_eif_1, "eif_0" = obs_data_eif_0))
+              "eif_1" = obs_data_eif_1, "eif_0" = obs_data_eif_0,
+              "eif_rr_nolog" = obs_data_eif_rr_nolog))
 }
 
 # estimate the optimal raking variable using regression
@@ -662,7 +675,7 @@ get_all_calibrated_weights <- function(data = NULL, missing_indicator = "Delta",
                                        stratified = FALSE,
                                        strata_form = "") {
   if (is.character(family)) {
-    family <- ifelse(family == "gaussian", gaussian(), binomial())
+    family <- match.fun(family)()
   }
   raking_outcome_name <- outcome_name
   if (errorprone_outcome_name != outcome_name) {
@@ -783,6 +796,9 @@ marginalize_conditional_est <- function(fit = NULL, design = NULL, coefficient_o
   rr_comparison <- avg_comparisons(fit, comparison = "lnratioavg",
                                    variables = coefficient_of_interest,
                                    wts = these_weights)
+  rr_comparison_nolog <- avg_comparisons(fit, comparison = "ratioavg",
+                                   variables = coefficient_of_interest,
+                                   wts = these_weights)
   or_comparison <- avg_comparisons(fit, comparison = "lnoravg",
                                    variables = coefficient_of_interest,
                                    wts = these_weights)
@@ -790,13 +806,93 @@ marginalize_conditional_est <- function(fit = NULL, design = NULL, coefficient_o
                    c(avg_preds[2, "estimate"], avg_preds[2, "std.error"]),
                    c(rd_comparison[1,"estimate"], rd_comparison[1,"std.error"]),
                    c(exp(rr_comparison[1,"estimate"]), rr_comparison[1,"std.error"]),
+                   # c(rr_comparison_nolog[1, "estimate"], rr_comparison_nolog[1, "std.error"]),
                    c(exp(or_comparison[1,"estimate"]), or_comparison[1,"std.error"]))
   # return
-  estimand <- c("mu0", "mu1", "ATE","RR","OR")
+  estimand <- c("mu0", "mu1", "ATE",
+                # "logRR",
+                "RR", "OR")
 
   results <- cbind.data.frame(estimand, results)
   colnames(results) <- c("estimand","est","SE")
   return(results)
+}
+
+# complete-case estimators, as a benchmark -------------------------------------
+run_cc <- function(data = NULL,
+                   outcome_formula = "Y ~ A + W",
+                   tx_formula = "A ~ W",
+                   coefficient_of_interest = "A",
+                   outcome_name = "Y", tx_type = "adjust", use_meat = FALSE,
+                   rescale_ps = FALSE, family = "binomial") {
+  if (is.character(family)) {
+    family <- switch(as.numeric(family == "gaussian"), gaussian(), binomial())
+  }
+  # estimate OR
+  est_or <- get_outcome_regression(
+    data = data, formula = outcome_formula, coefficient_of_interest = coefficient_of_interest,
+    model = "parametric",  family = family, use_weights = FALSE
+  )
+
+  # estimate PS
+  est_ps <- get_propensity_score(
+    data = data, formula = tx_formula, variable = coefficient_of_interest,
+    model = "parametric", use_weights = FALSE
+  )
+
+  # marginalize conditional estimator
+  fit <- glm(as.formula(outcome_formula), data = data, family = family)
+  avg_preds <- avg_predictions(fit, variables = coefficient_of_interest)
+  rd_comparison <- avg_comparisons(fit, comparison = "differenceavg",
+                                   variables = coefficient_of_interest)
+  rr_comparison <- avg_comparisons(fit, comparison = "lnratioavg",
+                                   variables = coefficient_of_interest)
+  rr_comparison_nolog <- avg_comparisons(fit, comparison = "ratioavg",
+                                         variables = coefficient_of_interest)
+  results <- rbind(c(avg_preds[1, "estimate"], avg_preds[1, "std.error"]),
+                   c(avg_preds[2, "estimate"], avg_preds[2, "std.error"]),
+                   c(rd_comparison[1,"estimate"], rd_comparison[1,"std.error"]),
+                   c(exp(rr_comparison[1,"estimate"]), rr_comparison[1,"std.error"]))
+  # return
+  estimand <- c("mu0", "mu1", "ATE", "RR")
+
+  cond_results <- cbind.data.frame(estimand, results)
+  colnames(cond_results) <- c("estimand","est","SE")
+  cond_results$outcome_tx_estimator <- tx_type
+  cond_results$miss_estimator <- "CGR"
+
+  # use AIPTW
+  mu_1 <- estimate_tx_specific_mean(
+    a = data[[coefficient_of_interest]], a_level = 1, y = data[[outcome_name]],
+    delta = rep(1, nrow(data)),
+    outcome_regression = est_or$preds, outcome_regression_a = est_or$preds_1,
+    prob_ps = est_ps$ps_1
+  )
+  mu_0 <- estimate_tx_specific_mean(
+    a = data[[coefficient_of_interest]], a_level = 0, y = data[[outcome_name]],
+    delta = rep(1, nrow(data)),
+    outcome_regression = est_or$preds, outcome_regression_a = est_or$preds_0,
+    prob_ps = est_ps$ps_0
+  )
+  all_eifs <- get_ideal_data_eifs(
+    data = data[, 1:10], Q = est_or$preds, Q_1 = est_or$preds_1, Q_0 = est_or$preds_0,
+    g_1 = est_ps$ps_1, g_0 = est_ps$ps_0, type = "ipw", psi_1 = mu_1, psi_0 = mu_0,
+    coefficient_of_interest = coefficient_of_interest, outcome_name = outcome_name,
+    glm_fit = est_or$fit, use_meat = use_meat
+  )
+  se_mu1 <- as.numeric(sqrt(crossprod(matrix(all_eifs$if_1))) / (nrow(data)))
+  se_mu0 <- as.numeric(sqrt(crossprod(matrix(all_eifs$if_0))) / (nrow(data)))
+  se_ate <- as.numeric(sqrt(crossprod(matrix(all_eifs$if_rd))) / (nrow(data)))
+  se_rr <- as.numeric(sqrt(crossprod(matrix(all_eifs$if_rr))) / (nrow(data)))
+
+  marg_result <- tibble::tibble(
+    "estimand" = c("mu1", "mu0", "ATE", "RR"),
+    "outcome_tx_estimator" = "aipw",
+    "miss_estimator" = "MGR",
+    "est" = c(mu_1, mu_0, mu_1 - mu_0, mu_1 / mu_0),
+    "SE" = c(se_mu1, se_mu0, se_ate, se_rr)
+  )
+  return(dplyr::bind_rows(cond_results, marg_result))
 }
 
 # GR for conditional parameter, then marginalizing -----------------------------
@@ -841,6 +937,9 @@ run_raking_conditional <- function(data = NULL,
                                    rescale_ps = TRUE,
                                    stratified = FALSE,
                                    strata_form = "") {
+  if (is.character(family)) {
+    family <- match.fun(family)()
+  }
   # get number of coefficients in outcome model
   init_fit <- glm(formula = as.formula(outcome_formula), family = family, data = data)
   num_coefs <- length(coefficients(init_fit))
@@ -945,6 +1044,8 @@ run_raking_conditional <- function(data = NULL,
     } else {
       fit <- survey::svyglm(outcome_formula, design = calibrated_design, family = quasibinomial(link = "probit"))
     }
+  } else if (family$family == "poisson") {
+    fit <- survey::svyglm(outcome_formula, design = calibrated_design, family = family)
   } else {
     stop("Currently only implemented for gaussian and binomial families.")
   }
@@ -1077,11 +1178,14 @@ get_ideal_data_eifs <- function(data = NULL,
                              eif0 = par_if_mu_0, estimand = "RD")
   par_if_rr <- full_data_eif(mu1 = psi_1, mu0 = psi_0, eif1 = par_if_mu_1,
                              eif0 = par_if_mu_0, estimand = "RR")
+  par_if_rr_nolog <- full_data_eif(mu1 = psi_1, mu0 = psi_0, eif1 = par_if_mu_1,
+                             eif0 = par_if_mu_0, estimand = "nologRR")
   par_if_or <- full_data_eif(mu1 = psi_1, mu0 = psi_0, eif1 = par_if_mu_1,
                              eif0 = par_if_mu_0, estimand = "OR")
   return(list("if_1" = par_if_mu_1, "if_0" = par_if_mu_0,
               "if_rd" = par_if_rd, "if_rr" = par_if_rr, "if_or" = par_if_or,
-              "np_if_1" = np_if_mu_1, "np_if_0" = np_if_mu_0))
+              "np_if_1" = np_if_mu_1, "np_if_0" = np_if_mu_0,
+              "if_rr_nolog" = par_if_rr_nolog))
 }
 
 # get nonparametric, parametric ideal-data EIFs and observed-data EIFs
@@ -1152,6 +1256,7 @@ get_all_eifs <- function(data = NULL,
   par_if_rd <- full_data_eifs$if_rd
   par_if_rr <- full_data_eifs$if_rr
   par_if_or <- full_data_eifs$if_or
+  par_if_rr_nolog <- full_data_eifs$if_rr_nolog
   # estimate the IF projections
   if (use_imputation) {
     # estimate using MI
@@ -1169,6 +1274,7 @@ get_all_eifs <- function(data = NULL,
     if_projections_0 <- mi_eifs$eif_0
     if_projections_rd <- mi_eifs$eif_rd
     if_projections_rr <- mi_eifs$eif_rr
+    if_projections_rr_nolog <- mi_eifs$eif_rr_nolog
     if_projections_or <- mi_eifs$eif_or
   } else {
     reg_eifs <- estimate_eif_projection_regression(
@@ -1181,6 +1287,7 @@ get_all_eifs <- function(data = NULL,
     if_projections_0 <- reg_eifs$projection_0
     if_projections_rd <- reg_eifs$projection_rd
     if_projections_rr <- reg_eifs$projection_rr
+    if_projections_rr_nolog <- rep(NA, length(reg_eifs$projection_rr))
     if_projections_or <- reg_eifs$projection_or
   }
   # estimate the observed-data influence functions
@@ -1204,6 +1311,10 @@ get_all_eifs <- function(data = NULL,
     delta = delta, prob_obs = prob_obs,
     full_eif = par_if_or, eif_projection = if_projections_or
   )
+  observed_if_rr_nolog <- observed_data_eif(
+    delta = delta, prob_obs = prob_obs,
+    full_eif = par_if_rr_nolog, eif_projection = if_projections_rr_nolog
+  )
   # return
   return(list("obs_if_ate" = observed_if_rd, "obs_if_rr" = observed_if_rr, "obs_if_or" = observed_if_or,
               "obs_if_mu_1" = observed_if_mu_1, "obs_if_mu_0" = observed_if_mu_0,
@@ -1212,7 +1323,9 @@ get_all_eifs <- function(data = NULL,
               "par_if_rd" = par_if_rd, "par_if_rr" = par_if_rr, "par_if_or" = par_if_or,
               "projection_1" = if_projections_1, "projection_0" = if_projections_0,
               "projection_rd" = if_projections_rd, "projection_rr" = if_projections_rr,
-              "projection_or" = if_projections_or
+              "projection_or" = if_projections_or,
+              "obs_if_rr_nolog" = observed_if_rr_nolog, "par_if_rr_nolog" = par_if_rr_nolog,
+              "projection_rr_nolog" = if_projections_rr_nolog
   ))
 }
 # general function to run marginal estimation, either IPW or AIPW for tx propensity
@@ -1271,7 +1384,9 @@ run_marginal <- function(data = NULL,
                          calibrate_separate = FALSE,
                          stratified = FALSE,
                          strata_form = "") {
-
+  if (is.character(family)) {
+    family <- match.fun(family)()
+  }
   internal_miss_estimator <- ifelse(
     grepl("MR", miss_estimator) | grepl("raking", miss_estimator) | grepl("MGR", miss_estimator), "ipw",
     miss_estimator
@@ -1442,6 +1557,10 @@ run_marginal <- function(data = NULL,
       delta = delta, prob_obs = prob_obs_long, full_eif = all_eifs$par_if_rr,
       eif_projection = all_eifs$projection_rr
     )
+    final_eifs$obs_if_rr_nolog <- observed_data_eif(
+      delta = delta, prob_obs = prob_obs_long, full_eif = all_eifs$par_if_rr_nolog,
+      eif_projection = all_eifs$projection_rr_nolog
+    )
     final_eifs$obs_if_or <- observed_data_eif(
       delta = delta, prob_obs = prob_obs_long, full_eif = all_eifs$par_if_or,
       eif_projection = all_eifs$projection_or
@@ -1454,6 +1573,7 @@ run_marginal <- function(data = NULL,
   final_observed_if_mu_0 <- final_eifs$obs_if_mu_0
   final_observed_if_ate <- final_eifs$obs_if_ate
   final_observed_if_rr <- final_eifs$obs_if_rr
+  final_observed_if_rr_nolog <- final_eifs$obs_if_rr_nolog
   final_observed_if_or <- final_eifs$obs_if_or
 
   # return point estimates and SEs
@@ -1466,14 +1586,21 @@ run_marginal <- function(data = NULL,
   se_mu_0 <- as.numeric(sqrt(crossprod(matrix(final_observed_if_mu_0))) / (nrow(data)))
   se_ate <- as.numeric(sqrt(crossprod(matrix(final_observed_if_ate))) / (nrow(data)))
   se_logrr <- as.numeric(sqrt(crossprod(matrix(final_observed_if_rr))) / (nrow(data)))
+  se_rr <- as.numeric(sqrt(crossprod(matrix(final_observed_if_rr_nolog))) / (nrow(data)))
   se_logor <- as.numeric(sqrt(crossprod(matrix(final_observed_if_or))) / (nrow(data)))
 
   result_tib <- tibble::tibble(
-    "estimand" = c("mu1", "mu0", "ATE", "RR", "OR"),
+    "estimand" = c("mu1", "mu0", "ATE",
+                   # "logRR",
+                   "RR", "OR"),
     "outcome_tx_estimator" = outcome_tx_estimator,
     "miss_estimator" = miss_estimator,
-    "est" = c(mu_1, mu_0, ate, rr, or),
-    "SE" = c(se_mu_1, se_mu_0, se_ate, se_logrr, se_logor)
+    "est" = c(mu_1, mu_0, ate,
+              # rr,
+              rr, or),
+    "SE" = c(se_mu_1, se_mu_0, se_ate, se_logrr,
+             # se_rr,
+             se_logor)
   )
   return(
     list(

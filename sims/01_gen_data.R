@@ -7,10 +7,10 @@
 # @param scenario the scenario (e.g., 1) which determines the outcome regression and missing-data model formulas
 # @param plasmode logical, whether or not this is a plasmode data analysis
 get_formulas <- function(scenario = 1, include_a = FALSE) {
-  if (scenario %in% 3:8) {
+  if (scenario %in% 3:14) {
     include_a <- TRUE
   }
-  simple_scenarios <- c(1:2, 9:10, 96, 97, 98, 99)
+  simple_scenarios <- c(1:2, 9:10, 12, 14, 96, 97, 98, 99)
   misspecified_scenarios <- c(3:4, 5:8)
   census_formula <- paste0("Y ~ X + Zs + Zw + Ws + Ww", ifelse(include_a, " + As + Aw", ""))
   outcome_formula <- paste0("Y ~ X + Zs + Zw + Ws_obs + Ww_obs", ifelse(include_a, " + As + Aw", ""))
@@ -85,18 +85,25 @@ gen_data <- function(N = 100, scenario = 1,
 # @return a vector of outcomes
 gen_y <- function(data, scenario = 1) {
   continuous_outcome_scenarios <- c(1, 3, 5, 7, 9, 97, 99)
-  binary_outcome_scenarios <- c(2, 4, 6, 8, 10, 96, 98)
+  binary_outcome_scenarios <- c(2, 4, 6, 8, 10, 12, 14, 96, 98)
+  probit_scenarios <- c(14)
   misspecified_scenarios <- c(5:8)
-  rare_scenarios <- c(3, 4, 9, 10)
+  rare_scenarios <- c(3, 4, 9, 10, 12, 14)
   # specify regression model parameters
-  if (scenario %in% continuous_outcome_scenarios) {
+  # if (scenario %in% continuous_outcome_scenarios) {
+  if ((scenario %% 2) == 1) { # odd numbered scenarios are continuous
     # continuous outcome, simple model
     beta0 <- -0.25
-    betaX <- 0.5
-    betaZw <- -0.1
-    betaZs <- 0.2
-    betaWw <- -0.1
-    betaWs <- 0.2
+    # betaX <- 0.5
+    # betaZw <- -0.1
+    # betaZs <- 0.2
+    # betaWw <- -0.1
+    # betaWs <- 0.2
+    betaX <- 1.5
+    betaZw <- -1
+    betaZs <- 1
+    betaWw <- -1
+    betaWs <- 1
     betaUw <- 0
     betaUs <- 0
     betaAs <- 0
@@ -105,14 +112,21 @@ gen_y <- function(data, scenario = 1) {
       "name" = c("Intercept", "X", "Zw", "Zs", "Ww", "Ws"),
       "value" = c(beta0, betaX, betaZw, betaZs, betaWw, betaWs)
     )
-  } else if (scenario %in% binary_outcome_scenarios) {
+  # } else if (scenario %in% binary_outcome_scenarios) {
+  } else if ((scenario %% 2) == 0) {
     # binary outcome, simple models
-    beta0 <- -1.6
-    betaX <- ifelse(scenario == 2, 0.5, 1)
-    betaZw <- -0.5
-    betaZs <- 0.5
-    betaWw <- -0.5
-    betaWs <- 0.5
+    # beta0 <- -1.6
+    beta0 <- -2.6
+    # betaX <- ifelse(scenario == 2, 0.5, 1)
+    # betaZw <- -0.5
+    # betaZs <- 0.5
+    # betaWw <- -0.5
+    # betaWs <- 0.5
+    betaX <- 1.5
+    betaZw <- -1
+    betaZs <- 1
+    betaWw <- -1
+    betaWs <- 1
     betaUw <- 0
     betaUs <- 0
     betaAs <- 0
@@ -128,8 +142,10 @@ gen_y <- function(data, scenario = 1) {
     # rarer outcome
     # beta0 <- ifelse(scenario %in% c(7, 8), -4.5, -3)
     beta0 <- ifelse(scenario %in% misspecified_scenarios, -8, -3)
-    betaAs <- 0.05
-    betaAw <- -0.05
+    # betaAs <- 0.05
+    # betaAw <- -0.05
+    betaAs <- 0.75
+    betaAw <- -0.75
     # non-zero coefficient for U variables
     # if (scenario %in% c(7, 8)) {
     if (scenario %in% misspecified_scenarios) {
@@ -160,7 +176,13 @@ gen_y <- function(data, scenario = 1) {
     Y <- as.numeric(Xbeta + rnorm(nrow(data), 0, 1))
   } else if (scenario %in% binary_outcome_scenarios) {
     # logistic outcome
-    Y <- as.numeric(runif(nrow(data)) < stats::plogis(Xbeta))
+    if (!(scenario %in% probit_scenarios)) {
+      Y <- as.numeric(runif(nrow(data)) < stats::plogis(Xbeta))
+    } else {
+      # probit outcome
+      Y <- as.numeric(0 < Xbeta + rnorm(nrow(data)))
+    }
+
   }
   return(list("Y" = Y, "coefs" = all_betas))
 }
@@ -204,21 +226,22 @@ gen_miss <- function(data, scenario = 1) {
     alphaAw <- 0
     alphaY <- ifelse(scenario %% 2 == 0, 0.05, 0.025)
   }
-  if (scenario %in% 3:8) {
+  # if (scenario %in% 3:8) {
+  if (scenario > 2) {
     alphaAs <- -0.1
     alphaAw <- -0.1
   }
   if (scenario %in% c(9, 10)) {
-    alpha0 <- 0.05
-    alphaUs <- -1
-    alphaUw <- 1
+    # alpha0 <- 0.05
+    alphaUs <- -0.5
+    alphaUw <- 0.5
   }
   XbetaM <- alpha0 + alphaX * data$X + alphaZw * data$Zw +
     alphaZs * data$Zs + alphaUs * data$Us + alphaUw * data$Uw + alphaY * data$Y +
     alphaAs * data$As + alphaAw * data$Aw
   all_betas <- data.frame(
-    "name" = c("Intercept", "X", "Zw", "Zs", "Y"),
-    "value" = c(alpha0, alphaX, alphaZw, alphaZs, alphaY)
+    "name" = c("Intercept", "X", "Zw", "Zs", "Aw", "As", "Uw", "Us", "Y"),
+    "value" = c(alpha0, alphaX, alphaZw, alphaZs, alphaAw, alphaAs, alphaUw, alphaUs, alphaY)
   )
 
   miss <- as.numeric(runif(nrow(data)) < stats::plogis(XbetaM))
@@ -255,7 +278,7 @@ gen_x <- function(N = 100, scenario = 1, gencor = 0) {
   no_w_tx_ps <- c(96, 97)
   # misspecified_scenarios <- c(5, 6)
   misspecified_scenarios <- c(5:8)
-  include_a <- c(3:10)
+  include_a <- c(3:20)
   if (scenario %in% no_w_tx_ps) {
     # X does not depend on W's
     beta <- c(rep(0.1, 3), rep(0, 6))

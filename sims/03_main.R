@@ -28,7 +28,7 @@ source(paste0(proj_root, "/code/sims/02_run_ests.R"))
 parser <- OptionParser()
 parser <- add_option(parser, "--nreps-total", default = 500, help = "Number of simulation replicates in total")
 parser <- add_option(parser, "--n", default = 500, help = "Sample size")
-parser <- add_option(parser, "--scenario", default = 4, help = "Outcome regression model scenario")
+parser <- add_option(parser, "--scenario", default = 14, help = "Outcome regression model scenario")
 parser <- add_option(parser, "--estimator", default = "CGR-IPTW;CGR-adjust;MGR;AIPCW-AIPTW", help = "The estimator(s) to run")
 parser <- add_option(parser, "--use-cached-datasets", default = 0, help = "Should we use cached datasets or create a new dataset each time?")
 parser <- add_option(parser, "--data-only", default = 0, help = "Should we only generate datasets?")
@@ -125,6 +125,12 @@ seeds <- future_lapply(as.list(seq_len(nreps_total)), FUN = function(x) .Random.
                        future.chunk.size = Inf, future.seed = current_seed)
 
 continuous_outcome_scenarios <- c(1, 3, 5, 7, 9, 97, 99)
+if (scenario == 12) {
+  args$link <- "poisson"
+}
+if (scenario == 14) {
+  args$link <- "probit"
+}
 if (scenario %in% continuous_outcome_scenarios) {
   family <- "gaussian"
   fam_txt <- "identity"
@@ -135,9 +141,12 @@ if (scenario %in% continuous_outcome_scenarios) {
   } else if (args$link == "probit") {
     family <- binomial(link = "probit")
     fam_txt <- "probit"
-  } else {
+  } else if (args$link == "identity") {
     family <- "gaussian"
     fam_txt <- "identity"
+  } else {
+    family <- "poisson"
+    fam_txt <- "poisson"
   }
 }
 use_hal <- (args$eif_reg_type == "hal")
