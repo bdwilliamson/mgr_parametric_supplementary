@@ -24,16 +24,18 @@ set testing=0
 set outdir="%cd%\rout"
 
 set found=false
-for %%i in (1 3 5 7 9 97 99) do (
+for %%i in (1 3 5 7 9 17 97 99) do (
   if /i "!scenario!"=="%%i" (
     set found=true
   )
 )
 
 IF "!found!"=="true" (
-    set "nlist=500 1000 2000 5000"
+    :: set "nlist=500 1000 2000 5000"
+    set "nlist=250 500 1000 2000"
 ) ELSE (
-    set "nlist=2000 4000 8000 20000"
+    :: set "nlist=2000 4000 8000 20000"
+    set "nlist=1000 2000 4000 8000"
 )
 
 if not exist %outdir% mkdir %outdir%

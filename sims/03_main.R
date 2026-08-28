@@ -28,7 +28,7 @@ source(paste0(proj_root, "/code/sims/02_run_ests.R"))
 parser <- OptionParser()
 parser <- add_option(parser, "--nreps-total", default = 500, help = "Number of simulation replicates in total")
 parser <- add_option(parser, "--n", default = 500, help = "Sample size")
-parser <- add_option(parser, "--scenario", default = 14, help = "Outcome regression model scenario")
+parser <- add_option(parser, "--scenario", default = 17, help = "Outcome regression model scenario")
 parser <- add_option(parser, "--estimator", default = "CGR-IPTW;CGR-adjust;MGR;AIPCW-AIPTW", help = "The estimator(s) to run")
 parser <- add_option(parser, "--use-cached-datasets", default = 0, help = "Should we use cached datasets or create a new dataset each time?")
 parser <- add_option(parser, "--data-only", default = 0, help = "Should we only generate datasets?")
@@ -124,7 +124,7 @@ set.seed(current_seed)
 seeds <- future_lapply(as.list(seq_len(nreps_total)), FUN = function(x) .Random.seed,
                        future.chunk.size = Inf, future.seed = current_seed)
 
-continuous_outcome_scenarios <- c(1, 3, 5, 7, 9, 97, 99)
+continuous_outcome_scenarios <- c(1, 3, 5, 7, 9, 15, 17, 97, 99)
 if (scenario == 12) {
   args$link <- "poisson"
 }
