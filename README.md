@@ -1,6 +1,6 @@
 # Supplementary materials for the parametric MGR paper
 
-This repository contains code to reproduce the analyses in ["Marginal generalized raking with parametric working models"](https://arxiv.org/abs/) by Williamson, Zou, Lumley, Shepherd, and Shaw [(_arXiv_, 2026+)](https://doi.org/10.48550/arXiv.2605.31567). All analyses were implemented in the freely available R programming language, specifically, R version 4.0.2 or later. 
+This repository contains code to reproduce the analyses in ["Marginal generalized raking with parametric working models"](https://doi.org/10.48550/arXiv.2605.31567) by Williamson, Zou, Lumley, Shepherd, and Shaw (_arXiv_, 2026+). All analyses were implemented in the freely available R programming language, specifically, R version 4.0.2 or later. 
 
 Further, all analyses were performed on multi-core virtual machines running the Windows operating system. There is code provided in each of the directories that will run the simulations from the Windows command prompt (`cmd`). If you use another system or batch job scheduler (e.g., a Linux cluster), these can serve as templates. You may also run the analyses locally, but they will take more time.
 
