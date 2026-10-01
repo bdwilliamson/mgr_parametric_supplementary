@@ -28,7 +28,7 @@ format_sci <- function(x, digits = 4) {
 # read in results --------------------------------------------------------------
 output_dir <- paste0(proj_root, "/results/sims/")
 plots_dir <- paste0(proj_root, "/plots/")
-scenarios <- as.character(c(1,2,3,4,5,6,7,8,9,10,12))
+scenarios <- as.character(c(1,2,3,4,5,6,7,8,9,10))
 nreps <- "2500"
 nreps_numeric <- 2500
 ns <- as.character(sort(unique(c(c(250, 500, 1000, 2000, 5000, 20000), c(1000, 2000, 4000, 8000, 20000, 40000)))))
@@ -49,7 +49,7 @@ all_output_list <- lapply(as.list(1:length(all_est_scenarios)), function(i) {
 all_output <- as_tibble(do.call(rbind, all_output_list))
 
 continuous_outcome_scenarios <- c(1, 3, 5, 7, 9)
-binary_outcome_scenarios <- c(2, 4, 6, 8, 10, 12)
+binary_outcome_scenarios <- c(2, 4, 6, 8, 10)
 num_scenarios <- length(c(continuous_outcome_scenarios, binary_outcome_scenarios))
 # round true values to 3 significant digits
 true_values <- readRDS(paste0(proj_root, "/code/sims/true_values.rds")) %>%
@@ -80,12 +80,13 @@ true_values_tab <- true_values %>%
     scenario == 6 ~ "3b",
     scenario == 7 ~ "4a",
     scenario == 8 ~ "4b",
+    # scenario == 12 ~ "5",
     scenario == 9 ~ "5a",
-    scenario == 10 ~ "5b",
-    scenario == 12 ~ "6"
+    scenario == 10 ~ "5b"
   )) %>%
   mutate(scenario = as.character(scenario)) %>%
   filter(!grepl("OR", estimand)) %>%
+  arrange(scenario2) %>%
   pivot_wider(id_cols = "estimand", names_from = "scenario2", values_from = "truth") %>%
   arrange(estimand) %>%
   mutate(across(-estimand, .fns = ~ ifelse(is.na(.x), "", round(.x, 2)))) %>%
@@ -218,9 +219,9 @@ long_summary_tib <- summary_tib %>%
     scenario == 6 ~ "3b",
     scenario == 7 ~ "4a",
     scenario == 8 ~ "4b",
+    # scenario == 12 ~ "5",
     scenario == 9 ~ "5a",
-    scenario == 10 ~ "5b",
-    scenario == 12 ~ "6"
+    scenario == 10 ~ "5b"
   ))
 
 long_summary_tib2 <- long_summary_tib %>%
@@ -580,8 +581,8 @@ x <- gen_x()
 for (i in 1:length(scenarios)) {
   this_scenario <- as.numeric(scenarios[i])
   these_outcome_regression_coefs <- gen_y(data = x, scenario = this_scenario)$coefs
-  if (nrow(these_outcome_regression_coefs) != (length(names(x)) + 1)) {
-    other_coefs <- rep(0, length(names(x)) - nrow(these_outcome_regression_coefs) + 1)
+  if (nrow(these_outcome_regression_coefs) != (length(names(x)) + 3)) {
+    other_coefs <- rep(0, length(names(x)) - nrow(these_outcome_regression_coefs) + 3)
     these_nms <- names(x)[!(names(x) %in% these_outcome_regression_coefs$name)]
     these_outcome_regression_coefs <- rbind.data.frame(these_outcome_regression_coefs,
                                                        data.frame(name = these_nms, value = other_coefs))
@@ -610,10 +611,11 @@ all_outcome_coefs_df <- do.call(rbind.data.frame, all_outcome_coefs) %>%
            scenario == 6 ~ "3b",
            scenario == 7 ~ "4a",
            scenario == 8 ~ "4b",
+           # scenario == 12 ~ "5",
            scenario == 9 ~ "5a",
-           scenario == 10 ~ "5b",
-           scenario == 12 ~ "6"
-         ))
+           scenario == 10 ~ "5b"
+         )) %>%
+  filter(!(name %in% c("X2", "Zs2", "ZsZw")))
 all_missing_coefs_df <- do.call(rbind.data.frame, all_missing_coefs) %>%
   mutate(scenario2 = case_when(
     scenario == 1 ~ "1a",
@@ -624,10 +626,11 @@ all_missing_coefs_df <- do.call(rbind.data.frame, all_missing_coefs) %>%
     scenario == 6 ~ "3b",
     scenario == 7 ~ "4a",
     scenario == 8 ~ "4b",
+    # scenario == 12 ~ "5",
     scenario == 9 ~ "5a",
-    scenario == 10 ~ "5b",
-    scenario == 12 ~ "6"
-  ))
+    scenario == 10 ~ "5b"
+  )) %>%
+  filter(!(name %in% c("X2", "ZsZw")))
 
 all_tx_coefs_df <- rbind.data.frame(
   data.frame(
@@ -671,17 +674,17 @@ all_tx_coefs_df <- rbind.data.frame(
     value = c(rep(0.1, 5), c(-1, -1, -0.4, -0.2))
   ),
   data.frame(
-    scenario = "9", scenario2 = "5a",
+    scenario = "9", scenario2 = "6a",
     name = c("Intercept", "Zs", "Zw", "Ws", "Ww", "Us", "Uw", "As", "Aw"),
     value = c(rep(0.1, 5), c(-1, -1, -0.4, -0.2))
   ),
   data.frame(
-    scenario = "10", scenario2 = "5b",
+    scenario = "10", scenario2 = "6b",
     name = c("Intercept", "Zs", "Zw", "Ws", "Ww", "Us", "Uw", "As", "Aw"),
     value = c(rep(0.1, 5), c(-1, -1, -0.4, -0.2))
   ),
   data.frame(
-    scenario = "12", scenario2 = "6",
+    scenario = "12", scenario2 = "5",
     name = c("Intercept", "Zs", "Zw", "Ws", "Ww", "Us", "Uw", "As", "Aw"),
     value = c(rep(0.1, 5), rep(0, 2), c(-0.4, -0.2))
   )

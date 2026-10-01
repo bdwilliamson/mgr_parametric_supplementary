@@ -114,8 +114,8 @@ gen_y <- function(data, scenario = 1) {
       betaZsZw <- 1
     }
     all_betas <- data.frame(
-      "name" = c("Intercept", "X", "Zw", "Zs", "Ww", "Ws"),
-      "value" = c(beta0, betaX, betaZw, betaZs, betaWw, betaWs)
+      "name" = c("Intercept", "X", "Zw", "Zs", "Ww", "Ws", "As", "Aw", "Us", "Uw", "Zs2", "ZsZw"),
+      "value" = c(beta0, betaX, betaZw, betaZs, betaWw, betaWs, betaAs, betaAw, betaUs, betaUw, betaZs2, betaZsZw)
     )
   # } else if (scenario %in% binary_outcome_scenarios) {
   } else if ((scenario %% 2) == 0) {
@@ -138,8 +138,8 @@ gen_y <- function(data, scenario = 1) {
       betaZsZw <- 1
     }
     all_betas <- data.frame(
-      "name" = c("Intercept", "X", "Zw", "Zs", "Ww", "Ws", "Zs2", "ZsZw"),
-      "value" = c(beta0, betaX, betaZw, betaZs, betaWw, betaWs, betaZs2, betaZsZw)
+      "name" = c("Intercept", "X", "Zw", "Zs", "Ww", "Ws", "As", "Aw", "Us", "Uw", "Zs2", "ZsZw"),
+      "value" = c(beta0, betaX, betaZw, betaZs, betaWw, betaWs, betaAs, betaAw, betaUs, betaUw, betaZs2, betaZsZw)
     )
   } else {
     stop("This scenario has not yet been implemented.")
